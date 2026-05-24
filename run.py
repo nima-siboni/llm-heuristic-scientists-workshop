@@ -4,7 +4,7 @@ import random
 
 from check      import check
 from evaluate   import evaluate
-from heuristics import edd, least_slack, lpt, random_priority, spt
+from heuristics.baseline import edd, least_slack, lpt, random_priority, spt
 from models.infra import ScheduleEntry, Scenario
 from scenarios  import ALL_SCENARIOS
 from placer     import PriorityFn, construct

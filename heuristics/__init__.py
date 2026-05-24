@@ -1,13 +1,6 @@
-"""Baseline priority functions. Higher priority = place next.
+"""Priority heuristics for the kitchen-scheduling problem.
 
-Each baseline lives in its own module so students can read them one at a
-time and add new heuristics by dropping in a new file.
+Two flavours, in parallel subpackages:
+  - heuristics.baseline:   hand-written textbook heuristics (EDD, SPT, ...)
+  - heuristics.discovered: LLM-discovered heuristics, one file per run
 """
-
-from .edd             import edd
-from .least_slack     import least_slack
-from .lpt             import lpt
-from .random_priority import random_priority
-from .spt             import spt
-
-__all__ = ["edd", "least_slack", "lpt", "random_priority", "spt"]

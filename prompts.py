@@ -70,22 +70,23 @@ def initial_prompt(scenario: Scenario) -> str:
 
 def refine_prompt(
     scenario: Scenario,
-    prev_code: str,
     prev_value: Optional[float],
     prev_error: Optional[str],
     best_so_far: Optional[float],
 ) -> str:
+    """The previous heuristic is already in the conversation history as the
+    last assistant message, so we don't re-embed its code here — just the
+    feedback on how it scored."""
     if prev_error:
-        feedback = f"The previous attempt raised an exception:\n{prev_error}"
+        feedback = f"Your previous attempt raised an exception:\n{prev_error}"
     else:
         feedback = (
-            f"Previous attempt total_lateness on the training scenario: {prev_value:.1f}\n"
+            f"Your previous attempt scored total_lateness = {prev_value:.1f}\n"
             f"Best total_lateness so far: {best_so_far:.1f}"
         )
     return (
         problem_brief(scenario)
-        + "\n\nPrevious heuristic:\n```python\n" + prev_code + "\n```\n\n"
-        + feedback
+        + "\n\n" + feedback
         + "\n\nPropose an improved `priority(task, state)` function. "
           "Diagnose what likely hurt the previous attempt and fix it. "
           "Keep the function interpretable."
