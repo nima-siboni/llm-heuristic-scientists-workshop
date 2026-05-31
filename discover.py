@@ -20,12 +20,15 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime
 
+from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+
+load_dotenv()
 
 from check                  import check
 from evaluate               import evaluate
 from heuristics.discovered  import RUNS_CSV, save_iteration
-from models.for_llm         import State, Task, earliest_start
+from models.for_llm         import Dish, Order, State, Station, Step, earliest_start
 from models.infra           import ScheduleEntry
 from placer                 import PriorityFn, construct
 from prompts                import SYSTEM, extract_code, initial_prompt, refine_prompt
@@ -36,6 +39,7 @@ MODEL          = "openai/gpt-oss-120b"
 ITERATIONS     = 5
 SCENARIO       = TRAINING
 EVAL_TIMEOUT_S = 5     # bound buggy priority() so it can't hang the workshop
+MAX_TOKENS     = 1500  # cap on assistant reply length per iteration
 
 
 class HeuristicTimeoutError(TimeoutError):
@@ -60,8 +64,12 @@ def time_limit(seconds: int):
 def compile_priority(code: str) -> PriorityFn:
     """Exec the generated code and return the `priority` callable. Workshop-grade
     sandboxing only — this is `exec` on LLM output, run it in a throwaway env.
-    Task, State, and earliest_start are injected so the LLM can use them."""
-    ns: dict = {"Task": Task, "State": State, "earliest_start": earliest_start}
+    The model's dataclasses + earliest_start are injected so the LLM can use
+    them (including in type annotations)."""
+    ns: dict = {
+        "Step": Step, "State": State, "Order": Order, "Dish": Dish, "Station": Station,
+        "earliest_start": earliest_start,
+    }
     exec(compile(code, "<llm-heuristic>", "exec"), ns)
     fn = ns.get("priority")
     if not callable(fn):
@@ -76,10 +84,6 @@ def build_schedule(priority_fn: PriorityFn) -> list[ScheduleEntry]:
     if violations:
         raise ValueError(f"schedule violates constraints: {violations[:3]}")
     return schedule
-
-
-def score(schedule: list[ScheduleEntry]) -> float:
-    return evaluate(schedule, SCENARIO.orders)
 
 
 def discover() -> None:
@@ -101,7 +105,7 @@ def discover() -> None:
             prompt = refine_prompt(SCENARIO, prev_value, prev_error, best_value)
 
         history.append({"role": "user", "content": prompt})
-        reply = client.chat_completion(messages=history, max_tokens=1500).choices[0].message.content
+        reply = client.chat_completion(messages=history, max_tokens=MAX_TOKENS).choices[0].message.content
         history.append({"role": "assistant", "content": reply})
 
         code = extract_code(reply)
@@ -115,7 +119,7 @@ def discover() -> None:
             with time_limit(EVAL_TIMEOUT_S):
                 fn       = compile_priority(code)
                 schedule = build_schedule(fn)
-                value    = score(schedule)
+                value    = evaluate(schedule, SCENARIO.orders)
         except Exception as exc:
             prev_error  = traceback.format_exc(limit=3)
             error_class = type(exc).__name__

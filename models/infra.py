@@ -1,19 +1,24 @@
 """Orchestration-only types. These are how the discovery loop and runner
 hand a problem instance to the placer and read back its output. The
 LLM-authored heuristic never sees any of these — they live outside its
-priority(task, state) contract.
+priority(step, state) contract.
 """
 
 from dataclasses import dataclass
 
 
 @dataclass
-class Order:
-    """A customer ticket: one or more dishes due by a deadline."""
+class OrderSpec:
+    """Input declaration of a customer ticket: dishes (by name) due by a deadline.
+
+    This is the wire format scenarios use. The placer turns each OrderSpec into
+    a fully-materialized models.for_llm.Order graph (Dish + Step objects) via
+    init_state. Heuristics never see OrderSpec — they walk the runtime graph.
+    """
     id:      int
     arrival: float
     due:     float
-    dishes:  list[str]            # dish names (keys into models.for_llm.DISHES)
+    dishes:  list[str]            # dish names (keys into models.for_llm.RECIPES)
 
 
 @dataclass
@@ -21,13 +26,13 @@ class Scenario:
     """A problem instance: a kitchen (station -> capacity) and a list of orders."""
     name:    str
     kitchen: dict[str, int]
-    orders:  list[Order]
+    orders:  list[OrderSpec]
 
 
 @dataclass
 class ScheduleEntry:
     """One row of a built schedule. Produced by the placer, consumed by check/evaluate."""
-    task:    str                  # task id
+    step:    str                  # step id
     station: str
     start:   float
     end:     float

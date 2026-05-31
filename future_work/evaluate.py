@@ -2,12 +2,12 @@
 choose which metric to optimize when comparing heuristics.
 """
 
-from models.for_llm import DISHES
-from models.infra   import Order, ScheduleEntry
+from models.for_llm import RECIPES
+from models.infra   import OrderSpec, ScheduleEntry
 
 
-def evaluate(schedule: list[ScheduleEntry], orders: list[Order]) -> dict:
-    by_tid: dict[str, ScheduleEntry] = {entry.task: entry for entry in schedule}
+def evaluate(schedule: list[ScheduleEntry], orders: list[OrderSpec]) -> dict:
+    by_sid: dict[str, ScheduleEntry] = {entry.step: entry for entry in schedule}
 
     dish_completion:  dict[str, float] = {}
     order_completion: dict[int, float] = {}
@@ -18,10 +18,10 @@ def evaluate(schedule: list[ScheduleEntry], orders: list[Order]) -> dict:
         for d_idx, dish_name in enumerate(order.dishes):
             slot = f"o{oid}.d{d_idx}"
             dish_ends: list[float] = []
-            for t_idx, _ in enumerate(DISHES[dish_name]):
-                tid = f"o{oid}.d{d_idx}.t{t_idx}"
-                if tid in by_tid:
-                    dish_ends.append(by_tid[tid].end)
+            for s_idx, _ in enumerate(RECIPES[dish_name]):
+                sid = f"o{oid}.d{d_idx}.s{s_idx}"
+                if sid in by_sid:
+                    dish_ends.append(by_sid[sid].end)
             if dish_ends:
                 dish_completion[slot] = max(dish_ends)
                 order_ends.extend(dish_ends)

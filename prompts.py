@@ -21,21 +21,22 @@ You are a scheduling researcher. You propose interpretable priority
 heuristics for a restaurant-kitchen scheduling problem and express each
 one as a single Python function:
 
-    def priority(task, state) -> float
+    def priority(step, state) -> float
 
-The placer is a list-builder: at each step it picks the highest-priority
-eligible task (one whose prereqs are all placed) and commits it to its
-station at the earliest feasible time. Higher priority = place this task next.
+The placer is a list-builder: at each iteration it picks the highest-priority
+eligible step (one whose prereq is None or already placed) and commits it to
+its station at the earliest feasible time. Higher priority = place this
+step next.
 
 Rules:
   - reply with one fenced ```python``` block, nothing else
   - the block must define exactly one top-level function named `priority`
   - no imports beyond the Python stdlib; no I/O; no randomness
-  - the heuristic must be read-only: do not mutate task or state
+  - the heuristic must be read-only: do not mutate step or state
 
-The shape of `task` and `state` is defined by models/for_llm.py below; the
+The shape of `step` and `state` is defined by models/for_llm.py below; the
 placement loop is in placer.py. Treat both as the authoritative spec.
-A helper `earliest_start(task, state) -> float` is available in the global
+A helper `earliest_start(step, state) -> float` is available in the global
 namespace (and defined in models/for_llm.py).
 
 ===== models/for_llm.py =====
@@ -47,8 +48,8 @@ namespace (and defined in models/for_llm.py).
 def problem_brief(scenario: Scenario) -> str:
     return textwrap.dedent(f"""
         Problem semantics:
-          - An order contains one or more dishes. A dish is a linear chain of tasks
-            (task i depends on task i-1). No dependencies across dishes.
+          - An order contains one or more dishes. A dish is a linear chain of steps
+            (step i depends on step i-1 via `step.prereq`). No dependencies across dishes.
           - Lateness is measured per ORDER: an order finishes when all its
             dishes finish, and lateness = max(0, finish - due).
           - Stations have limited capacity (see STATION_CAPACITY above);
@@ -64,7 +65,7 @@ def problem_brief(scenario: Scenario) -> str:
 def initial_prompt(scenario: Scenario) -> str:
     return (
         problem_brief(scenario)
-        + "\n\nPropose your first heuristic as a `priority(task, state)` function."
+        + "\n\nPropose your first heuristic as a `priority(step, state)` function."
     )
 
 
@@ -87,7 +88,7 @@ def refine_prompt(
     return (
         problem_brief(scenario)
         + "\n\n" + feedback
-        + "\n\nPropose an improved `priority(task, state)` function. "
+        + "\n\nPropose an improved `priority(step, state)` function. "
           "Diagnose what likely hurt the previous attempt and fix it. "
           "Keep the function interpretable."
     )

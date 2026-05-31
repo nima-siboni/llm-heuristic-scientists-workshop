@@ -1,108 +1,100 @@
 """Greedy task placer driven by a priority function.
 
-A heuristic is `priority(task, state) -> float` (higher = place next). The
-placer repeatedly picks the highest-priority eligible task (one whose
-prereqs are all placed) and commits it to its station at the earliest time
-allowed by its prereqs, the station's free slots, and the order's arrival.
+A heuristic is `priority(step, state) -> float` (higher = place next). The
+placer repeatedly picks the highest-priority eligible step (one whose prereq
+is None or already placed) and commits it to its station at the earliest
+time allowed by its prereq, the station's free slots, and the order's
+arrival.
 
-There is no global clock — each task's start/finish times are computed at
+There is no global clock — each step's start/finish times are computed at
 the moment it is placed. The heuristic sees the full state (placements so
-far, station availability, all orders and tasks) and decides which task to
-commit next.
+far, station availability, all orders/dishes/steps) and decides which step
+to commit next.
 """
 
 from typing import Callable
 
 from models.for_llm import (
-    DISHES,
-    DishInstance,
-    OrderState,
+    RECIPES,
+    Dish,
+    Order,
     State,
     Station,
-    Task,
+    Step,
     earliest_start,
 )
-from models.infra import Order, ScheduleEntry
+from models.infra import OrderSpec, ScheduleEntry
 
 
-PriorityFn = Callable[[Task, State], float]
+PriorityFn = Callable[[Step, State], float]
 
 
-def init_state(orders: list[Order], kitchen: dict[str, int]) -> State:
-    tasks:        dict[str, Task]         = {}
-    dishes:       dict[str, DishInstance] = {}
-    order_states: dict[int, OrderState]   = {}
-
-    for order in orders:
-        oid = order.id
-        order_states[oid] = OrderState(
-            id=oid, arrival=order.arrival, due=order.due, dishes=[],
-        )
-        for d_idx, dish_name in enumerate(order.dishes):
-            dish_slot = f"o{oid}.d{d_idx}"
-            task_ids: list[str] = []
-            prev_tid: str | None = None
-            for t_idx, step in enumerate(DISHES[dish_name]):
-                tid = f"o{oid}.d{d_idx}.t{t_idx}"
-                tasks[tid] = Task(
-                    id        = tid,
-                    name      = step.name,
-                    dish_name = dish_name,
-                    duration  = float(step.duration),
-                    station   = step.station,
-                    order     = oid,
-                    dish      = dish_slot,
-                    prereqs   = [prev_tid] if prev_tid else [],
+def init_state(orders: list[OrderSpec], kitchen: dict[str, int]) -> State:
+    state_orders: list[Order] = []
+    for spec in orders:
+        oid = spec.id
+        order = Order(id=oid, arrival=spec.arrival, due=spec.due)
+        for d_idx, dish_name in enumerate(spec.dishes):
+            dish = Dish(name=dish_name, order=order)
+            order.dishes.append(dish)
+            prev_step: Step | None = None
+            for s_idx, (duration, station) in enumerate(RECIPES[dish_name]):
+                step = Step(
+                    id        = f"o{oid}.d{d_idx}.s{s_idx}",
+                    duration  = float(duration),
+                    station   = station,
+                    dish      = dish,
+                    prereq    = prev_step,
                 )
-                task_ids.append(tid)
-                prev_tid = tid
-            dishes[dish_slot] = DishInstance(
-                slot=dish_slot, name=dish_name, order=oid, tasks=task_ids,
-            )
-            order_states[oid].dishes.append(dish_slot)
+                dish.steps.append(step)
+                prev_step = step
+        state_orders.append(order)
 
     stations = {
-        name: Station(name=name, capacity=cap, slot_free_times=[0.0] * cap)
+        name: Station(capacity=cap, slot_free_times=[0.0] * cap)
         for name, cap in kitchen.items()
     }
-    return State(stations=stations, tasks=tasks, dishes=dishes, orders=order_states)
+    return State(stations=stations, orders=state_orders)
 
 
-def eligible_tasks(state: State) -> list[str]:
-    """Unplaced tasks whose prereqs are all placed."""
+def all_steps(state: State) -> list[Step]:
+    return [s for o in state.orders for d in o.dishes for s in d.steps]
+
+
+def eligible_steps(state: State) -> list[Step]:
+    """Unplaced steps whose prereq is None or already placed."""
     return [
-        tid for tid, t in state.tasks.items()
-        if t.started_at is None
-        and all(state.tasks[p].started_at is not None for p in t.prereqs)
+        s for s in all_steps(state)
+        if s.started_at is None
+        and (s.prereq is None or s.prereq.started_at is not None)
     ]
 
 
-def place(state: State, tid: str) -> ScheduleEntry:
-    """Commit a task to its station at the earliest feasible time."""
-    t = state.tasks[tid]
-    s = state.stations[t.station]
-    start = earliest_start(t, state)
-    end   = start + t.duration
-    slot_idx = min(range(len(s.slot_free_times)), key=lambda i: s.slot_free_times[i])
-    s.slot_free_times[slot_idx] = end
-    t.started_at  = start
-    t.finished_at = end
-    return ScheduleEntry(task=tid, station=t.station, start=start, end=end)
+def place(state: State, step: Step) -> ScheduleEntry:
+    """Commit a step to its station at the earliest feasible time."""
+    station = state.stations[step.station]
+    start = earliest_start(step, state)
+    end   = start + step.duration
+    slot_idx = min(range(len(station.slot_free_times)), key=lambda i: station.slot_free_times[i])
+    station.slot_free_times[slot_idx] = end
+    step.started_at  = start
+    step.finished_at = end
+    return ScheduleEntry(step=step.id, station=step.station, start=start, end=end)
 
 
-def construct(orders: list[Order], kitchen: dict[str, int], priority_fn: PriorityFn) -> list[ScheduleEntry]:
+def construct(orders: list[OrderSpec], kitchen: dict[str, int], priority_fn: PriorityFn) -> list[ScheduleEntry]:
     state = init_state(orders, kitchen)
     schedule: list[ScheduleEntry] = []
-    total = len(state.tasks)
+    total = len(all_steps(state))
     while len(schedule) < total:
-        runnable = eligible_tasks(state)
+        runnable = eligible_steps(state)
         if not runnable:
             raise RuntimeError("no progress possible (cycle or infeasible inputs?)")
-        # Primary key: user-defined priority. Tie-break: prefer the task that
+        # Primary key: user-defined priority. Tie-break: prefer the step that
         # can start soonest — among equivalents, never starve the kitchen.
-        best = max(runnable, key=lambda tid: (
-            priority_fn(state.tasks[tid], state),
-            -earliest_start(state.tasks[tid], state),
+        best = max(runnable, key=lambda s: (
+            priority_fn(s, state),
+            -earliest_start(s, state),
         ))
         schedule.append(place(state, best))
     return schedule

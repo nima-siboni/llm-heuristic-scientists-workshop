@@ -1,7 +1,7 @@
-"""LPT (Longest Processing Time): push long tasks early so they don't block the end."""
+"""LPT (Longest Processing Time): push long steps early so they don't block the end."""
 
-from models.for_llm import State, Task
+from models.for_llm import State, Step
 
 
-def lpt(task: Task, state: State) -> float:
-    return task.duration
+def lpt(step: Step, state: State) -> float:
+    return step.duration

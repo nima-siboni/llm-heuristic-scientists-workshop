@@ -1,18 +1,18 @@
-"""Least slack: due - earliest_start(this task) - remaining_unplaced_work_for_order.
+"""Least slack: due - earliest_start(this step) - remaining_unplaced_work_for_order.
 
-The most urgent task (smallest slack) wins, so we return -slack.
+The most urgent step (smallest slack) wins, so we return -slack.
 """
 
-from models.for_llm import State, Task, earliest_start
+from models.for_llm import State, Step, earliest_start
 
 
-def least_slack(task: Task, state: State) -> float:
-    order = state.orders[task.order]
+def least_slack(step: Step, state: State) -> float:
+    order = step.dish.order
     remaining = sum(
-        state.tasks[tid].duration
-        for slot in order.dishes
-        for tid in state.dishes[slot].tasks
-        if state.tasks[tid].started_at is None
+        s.duration
+        for d in order.dishes
+        for s in d.steps
+        if s.started_at is None
     )
-    slack = order.due - earliest_start(task, state) - remaining
+    slack = order.due - earliest_start(step, state) - remaining
     return -slack

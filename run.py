@@ -42,7 +42,7 @@ def print_schedule(schedule: list[ScheduleEntry]) -> None:
     """Gantt-style text dump of a schedule, sorted by start time."""
     for entry in sorted(schedule, key=lambda e: (e.start, e.station)):
         print(f"  t={entry.start:5.1f} -> {entry.end:5.1f}  "
-              f"[{entry.station:<8}]  {entry.task}")
+              f"[{entry.station:<8}]  {entry.step}")
 
 
 if __name__ == "__main__":

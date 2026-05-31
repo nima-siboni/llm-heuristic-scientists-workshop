@@ -1,18 +1,18 @@
 """Independent constraint validator. Verifies any schedule, regardless of how it was built."""
 
-from models.for_llm import DISHES
-from models.infra   import Order, ScheduleEntry
+from models.for_llm import RECIPES
+from models.infra   import OrderSpec, ScheduleEntry
 
 
-def check(schedule: list[ScheduleEntry], orders: list[Order], kitchen: dict[str, int]) -> list[str]:
+def check(schedule: list[ScheduleEntry], orders: list[OrderSpec], kitchen: dict[str, int]) -> list[str]:
     """Return a list of violation strings. Empty list means the schedule is valid.
 
     Checks:
-      - every expected task appears exactly once
-      - tasks run on their required station
+      - every expected step appears exactly once
+      - steps run on their required station
       - durations match the recipe
       - intra-dish precedence is respected
-      - tasks do not start before their order arrives
+      - steps do not start before their order arrives
       - station capacity is never exceeded
     """
     EPS = 1e-9
@@ -22,45 +22,45 @@ def check(schedule: list[ScheduleEntry], orders: list[Order], kitchen: dict[str,
     for order in orders:
         oid = order.id
         for d_idx, dish_name in enumerate(order.dishes):
-            prev_tid: str | None = None
-            for t_idx, step in enumerate(DISHES[dish_name]):
-                tid = f"o{oid}.d{d_idx}.t{t_idx}"
-                expected[tid] = {
-                    "duration": float(step.duration),
-                    "station":  step.station,
-                    "prev":     prev_tid,
+            prev_sid: str | None = None
+            for s_idx, (duration, station) in enumerate(RECIPES[dish_name]):
+                sid = f"o{oid}.d{d_idx}.s{s_idx}"
+                expected[sid] = {
+                    "duration": float(duration),
+                    "station":  station,
+                    "prev":     prev_sid,
                     "arrival":  order.arrival,
                 }
-                prev_tid = tid
+                prev_sid = sid
 
-    by_tid: dict[str, ScheduleEntry] = {}
+    by_sid: dict[str, ScheduleEntry] = {}
     for entry in schedule:
-        if entry.task in by_tid:
-            violations.append(f"task {entry.task} scheduled more than once")
-        by_tid[entry.task] = entry
+        if entry.step in by_sid:
+            violations.append(f"step {entry.step} scheduled more than once")
+        by_sid[entry.step] = entry
 
-    for tid, e in expected.items():
-        if tid not in by_tid:
-            violations.append(f"task {tid} not scheduled")
+    for sid, e in expected.items():
+        if sid not in by_sid:
+            violations.append(f"step {sid} not scheduled")
             continue
-        s = by_tid[tid]
+        s = by_sid[sid]
         if abs((s.end - s.start) - e["duration"]) > EPS:
             violations.append(
-                f"task {tid} duration {s.end - s.start:.3f} != expected {e['duration']:.3f}"
+                f"step {sid} duration {s.end - s.start:.3f} != expected {e['duration']:.3f}"
             )
         if s.station != e["station"]:
             violations.append(
-                f"task {tid} on station {s.station} but recipe needs {e['station']}"
+                f"step {sid} on station {s.station} but recipe needs {e['station']}"
             )
         if s.start < e["arrival"] - EPS:
             violations.append(
-                f"task {tid} starts at {s.start:.3f} before arrival {e['arrival']}"
+                f"step {sid} starts at {s.start:.3f} before arrival {e['arrival']}"
             )
-        if e["prev"] is not None and e["prev"] in by_tid:
-            prev_end = by_tid[e["prev"]].end
+        if e["prev"] is not None and e["prev"] in by_sid:
+            prev_end = by_sid[e["prev"]].end
             if s.start < prev_end - EPS:
                 violations.append(
-                    f"task {tid} starts at {s.start:.3f} before prereq {e['prev']} ends at {prev_end:.3f}"
+                    f"step {sid} starts at {s.start:.3f} before prereq {e['prev']} ends at {prev_end:.3f}"
                 )
 
     for station, capacity in kitchen.items():

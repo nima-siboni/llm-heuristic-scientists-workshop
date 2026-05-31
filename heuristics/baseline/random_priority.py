@@ -1,9 +1,9 @@
-"""Random baseline — assigns each task a random priority."""
+"""Random baseline — assigns each step a random priority."""
 
 import random as _random
 
-from models.for_llm import State, Task
+from models.for_llm import State, Step
 
 
-def random_priority(task: Task, state: State) -> float:
+def random_priority(step: Step, state: State) -> float:
     return _random.random()
