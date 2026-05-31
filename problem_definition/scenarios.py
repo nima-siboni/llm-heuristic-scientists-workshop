@@ -1,7 +1,7 @@
 """Problem instances. Each scenario bundles a kitchen and a set of orders."""
 
-from models.for_llm import STATION_CAPACITY
-from models.infra   import OrderSpec, Scenario
+from problem_definition.model import STATION_CAPACITY
+from util.infra   import OrderSpec, Scenario
 
 
 TRAINING = Scenario(

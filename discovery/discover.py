@@ -22,18 +22,16 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+from problem_definition.check import check
+from problem_definition.evaluate import evaluate
+from heuristics.discovered  import RUNS_CSV, save_iteration
+from problem_definition.model         import Dish, Order, State, Station, Step, earliest_start
+from util.infra           import ScheduleEntry
+from discovery.placer       import PriorityFn, construct
+from discovery.prompts      import SYSTEM, extract_code, initial_prompt, refine_prompt
+from problem_definition.scenarios import TRAINING
 
 load_dotenv()
-
-from check                  import check
-from evaluate               import evaluate
-from heuristics.discovered  import RUNS_CSV, save_iteration
-from models.for_llm         import Dish, Order, State, Station, Step, earliest_start
-from models.infra           import ScheduleEntry
-from placer                 import PriorityFn, construct
-from prompts                import SYSTEM, extract_code, initial_prompt, refine_prompt
-from scenarios              import TRAINING
-
 
 MODEL          = "openai/gpt-oss-120b"
 ITERATIONS     = 5

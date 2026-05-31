@@ -4,8 +4,8 @@ Lateness for an order = max(0, completion - due). The kitchen wants this
 number as low as possible.
 """
 
-from models.for_llm import RECIPES
-from models.infra   import OrderSpec, ScheduleEntry
+from problem_definition.model import RECIPES
+from util.infra   import OrderSpec, ScheduleEntry
 
 
 def evaluate(schedule: list[ScheduleEntry], orders: list[OrderSpec]) -> float:

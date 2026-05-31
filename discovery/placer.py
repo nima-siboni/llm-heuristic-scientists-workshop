@@ -14,7 +14,7 @@ to commit next.
 
 from typing import Callable
 
-from models.for_llm import (
+from problem_definition.model import (
     RECIPES,
     Dish,
     Order,
@@ -23,7 +23,7 @@ from models.for_llm import (
     Step,
     earliest_start,
 )
-from models.infra import OrderSpec, ScheduleEntry
+from util.infra import OrderSpec, ScheduleEntry
 
 
 PriorityFn = Callable[[Step, State], float]

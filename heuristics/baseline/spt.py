@@ -1,6 +1,6 @@
 """SPT (Shortest Processing Time): prioritize quick steps first."""
 
-from models.for_llm import State, Step
+from problem_definition.model import State, Step
 
 
 def spt(step: Step, state: State) -> float:

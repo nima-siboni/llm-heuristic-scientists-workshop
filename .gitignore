@@ -11,3 +11,10 @@ venv/
 
 # Internal planning notes (not for participants)
 llm_heuristic_scientists_kitchen_workshop.md
+
+# Discovery run outputs
+heuristics/discovered/run_*.py
+heuristics/discovered/runs.csv
+
+# Generated Gantt PNGs
+gantt/

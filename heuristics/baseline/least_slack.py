@@ -3,7 +3,7 @@
 The most urgent step (smallest slack) wins, so we return -slack.
 """
 
-from models.for_llm import State, Step, earliest_start
+from problem_definition.model import State, Step, earliest_start
 
 
 def least_slack(step: Step, state: State) -> float:

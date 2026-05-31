@@ -2,8 +2,8 @@
 choose which metric to optimize when comparing heuristics.
 """
 
-from models.for_llm import RECIPES
-from models.infra   import OrderSpec, ScheduleEntry
+from problem_definition.model import RECIPES
+from util.infra   import OrderSpec, ScheduleEntry
 
 
 def evaluate(schedule: list[ScheduleEntry], orders: list[OrderSpec]) -> dict:

@@ -8,12 +8,13 @@ import textwrap
 from pathlib import Path
 from typing import Optional
 
-from models.infra import Scenario
+from util.infra import Scenario
 
 
-HERE = Path(__file__).parent
-PLACER_SRC        = (HERE / "placer.py").read_text()
-MODEL_FOR_LLM_SRC = (HERE / "models" / "for_llm.py").read_text()
+HERE       = Path(__file__).resolve().parent
+REPO_ROOT  = HERE.parent
+PLACER_SRC = (HERE / "placer.py").read_text()
+MODEL_SRC  = (REPO_ROOT / "problem_definition" / "model.py").read_text()
 
 
 SYSTEM = f"""\
@@ -34,13 +35,13 @@ Rules:
   - no imports beyond the Python stdlib; no I/O; no randomness
   - the heuristic must be read-only: do not mutate step or state
 
-The shape of `step` and `state` is defined by models/for_llm.py below; the
+The shape of `step` and `state` is defined by problem_definition/model.py below; the
 placement loop is in placer.py. Treat both as the authoritative spec.
 A helper `earliest_start(step, state) -> float` is available in the global
-namespace (and defined in models/for_llm.py).
+namespace (and defined in problem_definition/model.py).
 
-===== models/for_llm.py =====
-{MODEL_FOR_LLM_SRC}
+===== problem_definition/model.py =====
+{MODEL_SRC}
 ===== placer.py =====
 {PLACER_SRC}"""
 

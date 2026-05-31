@@ -2,7 +2,7 @@
 
 import random as _random
 
-from models.for_llm import State, Step
+from problem_definition.model import State, Step
 
 
 def random_priority(step: Step, state: State) -> float:

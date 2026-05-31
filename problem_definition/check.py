@@ -1,7 +1,7 @@
 """Independent constraint validator. Verifies any schedule, regardless of how it was built."""
 
-from models.for_llm import RECIPES
-from models.infra   import OrderSpec, ScheduleEntry
+from problem_definition.model import RECIPES
+from util.infra   import OrderSpec, ScheduleEntry
 
 
 def check(schedule: list[ScheduleEntry], orders: list[OrderSpec], kitchen: dict[str, int]) -> list[str]:

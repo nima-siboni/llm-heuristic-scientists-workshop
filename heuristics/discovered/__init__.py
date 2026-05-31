@@ -51,7 +51,7 @@ def save_iteration(
         f'  Status:         {status}\n'
         f'{lateness_line}'
         f'"""\n\n'
-        "from models.for_llm import State, Step, earliest_start  # noqa: F401\n\n\n"
+        "from problem_definition.model import State, Step, earliest_start  # noqa: F401\n\n\n"
     )
     py_path.write_text(header + code + "\n")
 

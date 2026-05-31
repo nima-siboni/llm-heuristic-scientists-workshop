@@ -12,13 +12,13 @@ class OrderSpec:
     """Input declaration of a customer ticket: dishes (by name) due by a deadline.
 
     This is the wire format scenarios use. The placer turns each OrderSpec into
-    a fully-materialized models.for_llm.Order graph (Dish + Step objects) via
+    a fully-materialized problem_definition.model.Order graph (Dish + Step objects) via
     init_state. Heuristics never see OrderSpec — they walk the runtime graph.
     """
     id:      int
     arrival: float
     due:     float
-    dishes:  list[str]            # dish names (keys into models.for_llm.RECIPES)
+    dishes:  list[str]            # dish names (keys into problem_definition.model.RECIPES)
 
 
 @dataclass

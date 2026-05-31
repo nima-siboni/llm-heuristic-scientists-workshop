@@ -1,6 +1,6 @@
 """EDD (Earliest Due Date): prioritize steps belonging to the most urgent order."""
 
-from models.for_llm import State, Step
+from problem_definition.model import State, Step
 
 
 def edd(step: Step, state: State) -> float:
