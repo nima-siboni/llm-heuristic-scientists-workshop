@@ -141,13 +141,12 @@ the bottom.
 
 ### Inspect the winning schedule
 
-Add `--gantt` to dump an ASCII Gantt of the winner per scenario, or
-`--gantt-png [DIR]` to save a colored PNG Gantt (default dir: `gantt/`).
+Add `--gantt [DIR]` to save a colored PNG Gantt of the winner per
+scenario (default dir: `gantt/`).
 
 ```bash
 .venv/bin/python leaderboard.py heuristics/baseline --gantt
-.venv/bin/python leaderboard.py heuristics/baseline --gantt-png
-.venv/bin/python leaderboard.py heuristics/baseline --gantt-png figs/
+.venv/bin/python leaderboard.py heuristics/baseline --gantt figs/
 ```
 
 In the rendered Gantt: color = order, in-bar digit = dish index within
@@ -158,11 +157,12 @@ into `prep #0`, `prep #1`, …
 ## Repo layout
 
 ```
-leaderboard.py           # score heuristics on every scenario (+ ASCII / PNG Gantt)
+leaderboard.py           # score heuristics on every scenario (+ PNG Gantt)
 discovery/
     discover.py          # the LLM discovery loop
     prompts.py           # system prompt + refinement prompt
     placer.py            # greedy list-placer driven by a priority fn
+    runtime.py           # time_limit + compile_priority (exec'd LLM code)
 problem_definition/
     model.py             # Order, Dish, Step, State, earliest_start
     evaluate.py          # total_lateness scoring

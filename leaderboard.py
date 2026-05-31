@@ -2,7 +2,7 @@
 
 Usage
 -----
-    python leaderboard.py <path> [<path> ...] [--gantt]
+    python leaderboard.py <path> [<path> ...] [--gantt DIR]
 
 Each <path> is either:
   - a .py file exposing a callable named `priority` (the convention used by
@@ -12,13 +12,16 @@ Each <path> is either:
     files whose names start with '_').
 
 For each heuristic, prints one row per scenario: total_lateness if the
-schedule is valid, otherwise INVALID(<n>) or ERR:<ExceptionName>. With
---gantt, also prints the schedule of the winning heuristic on each scenario.
+schedule is valid, otherwise INVALID(<n>) or ERR:<ExceptionName>. After
+the leaderboard, the winning heuristic on each scenario is rendered as a
+matplotlib Gantt PNG into the gantt directory (default: ./gantt/, override
+with --gantt DIR).
 
 Examples
 --------
     python leaderboard.py heuristics/baseline
-    python leaderboard.py heuristics/baseline heuristics/discovered --gantt
+    python leaderboard.py heuristics/baseline heuristics/discovered
+    python leaderboard.py heuristics/baseline --gantt out/charts
     python leaderboard.py heuristics/discovered/run_20260531_125241_iter1.py
 """
 
@@ -85,72 +88,6 @@ def score(fn: PriorityFn) -> dict[str, str]:
         except Exception as exc:
             out[sc.name] = f"ERR:{type(exc).__name__}"
     return out
-
-
-def print_schedule(schedule: list[ScheduleEntry]) -> None:
-    """Horizontal Gantt: one row per station-slot, time on the x-axis.
-
-    A station with capacity > 1 takes multiple rows (one per slot in use).
-    Each bar shows the order id (`o1`, `o2`, ...) at its left edge; the
-    rest of the bar is filled with `-`.
-    """
-    if not schedule:
-        print("  (empty schedule)")
-        return
-
-    horizon = int(round(max(e.end for e in schedule))) + 1
-    stations = sorted({e.station for e in schedule})
-
-    # Time axis: tick every 5 units.
-    LABEL_W = 12
-    axis = [" "] * horizon
-    for t in range(0, horizon, 5):
-        for k, ch in enumerate(str(t)):
-            if t + k < horizon:
-                axis[t + k] = ch
-    print(" " * LABEL_W + "".join(axis))
-    print(" " * LABEL_W + "".join("|" if t % 5 == 0 else "." for t in range(horizon)))
-
-    for station in stations:
-        entries = sorted([e for e in schedule if e.station == station], key=lambda e: e.start)
-        # First-fit pack each entry into the lowest-indexed slot whose
-        # previous occupant has already finished.
-        slot_free: list[float] = []
-        slot_of: dict[int, int] = {}
-        for e in entries:
-            for i, free in enumerate(slot_free):
-                if free <= e.start + 1e-9:
-                    slot_of[id(e)] = i
-                    slot_free[i] = e.end
-                    break
-            else:
-                slot_of[id(e)] = len(slot_free)
-                slot_free.append(e.end)
-
-        for slot in range(len(slot_free)):
-            row = [" "] * horizon
-            for e in entries:
-                if slot_of[id(e)] != slot:
-                    continue
-                s, end = int(round(e.start)), int(round(e.end))
-                # Order id -> single ASCII char (1 -> 'A', 2 -> 'B', ...).
-                # Wraps past 'Z' to lowercase for orders 27-52.
-                order_id = int(e.step.split(".")[0][1:])
-                tag = (chr(ord("A") + order_id - 1) if order_id <= 26
-                       else chr(ord("a") + order_id - 27))
-                # Bar: letter at start, '-' in the middle, '|' at the end
-                # (or just the letter if duration == 1).
-                e_clip = min(end, horizon)
-                n = e_clip - s
-                if n <= 0:
-                    continue
-                row[s] = tag
-                if n >= 2:
-                    for t in range(s + 1, s + n - 1):
-                        row[t] = "-"
-                    row[s + n - 1] = "|"
-            label = f"{station:<8} #{slot}" if len(slot_free) > 1 else f"{station:<10}"
-            print(f"{label:<{LABEL_W}}{''.join(row)}")
 
 
 def _pack_into_slots(entries: list[ScheduleEntry]) -> tuple[dict[int, int], int]:
@@ -241,14 +178,6 @@ def winners(rows: list[tuple[str, PriorityFn, dict[str, str]]]):
         yield sc, name, fn, value
 
 
-def print_winners(rows: list[tuple[str, PriorityFn, dict[str, str]]]) -> None:
-    """For each scenario, find the winning heuristic and print its Gantt."""
-    for sc, name, fn, value in winners(rows):
-        schedule = construct(sc.orders, sc.kitchen, fn)
-        print(f"\n=== {sc.name}: best = {name} (total_lateness = {value:.1f}) ===")
-        print_schedule(schedule)
-
-
 def save_winners_png(rows: list[tuple[str, PriorityFn, dict[str, str]]], out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for sc, name, fn, value in winners(rows):
@@ -267,12 +196,8 @@ def main(argv: list[str]) -> int:
         help=".py files or directories containing heuristic .py files",
     )
     parser.add_argument(
-        "--gantt", action="store_true",
-        help="after the leaderboard, dump the winning schedule per scenario (ASCII)",
-    )
-    parser.add_argument(
-        "--gantt-png", nargs="?", const="gantt", default=None, metavar="DIR",
-        help="save a PNG Gantt per scenario into DIR (default: ./gantt/)",
+        "--gantt", nargs="?", const="gantt", default=None, metavar="DIR",
+        help="save a PNG Gantt of the winner per scenario into DIR (default: ./gantt/)",
     )
     args = parser.parse_args(argv)
 
@@ -312,10 +237,8 @@ def main(argv: list[str]) -> int:
         row = "  ".join(f"{cells.get(s, '-'): >{col_w}}" for s in scenarios)
         print(f"{name:<{name_w}}  {row}")
 
-    if args.gantt:
-        print_winners(loaded)
-    if args.gantt_png is not None:
-        save_winners_png(loaded, Path(args.gantt_png))
+    if args.gantt is not None:
+        save_winners_png(loaded, Path(args.gantt))
     return 0
 
 

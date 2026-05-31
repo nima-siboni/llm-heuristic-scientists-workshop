@@ -1,37 +1,33 @@
-"""Discovery loop: ask GPT-OSS-120B (via Hugging Face) for a scheduling
-heuristic, run it through the simulator, feed total_lateness back, repeat.
+"""Discovery loop: ask an LLM for a scheduling heuristic, run it through
+the simulator, feed total_lateness back, repeat.
 
-Each iteration is persisted under heuristics/discovered/ (one .py file plus
-a row in runs.csv); see heuristics.discovered.save_iteration for details.
+Each iteration is persisted under heuristics/discovered/ (one .py file
+plus a row in runs.csv).
 
 Usage
 -----
-    export HF_TOKEN=hf_xxx
-    python discover.py                       # 5 iterations on the training scenario
-
-Requires
---------
-    pip install huggingface_hub
+    export HF_TOKEN=hf_xxx                       # or set it in .env
+    python -m discovery.discover                 # 5 iterations on TRAINING
 """
 
 import os
-import signal
 import traceback
-from contextlib import contextmanager
 from datetime import datetime
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
-from problem_definition.check import check
-from problem_definition.evaluate import evaluate
-from heuristics.discovered  import RUNS_CSV, save_iteration
-from problem_definition.model         import Dish, Order, State, Station, Step, earliest_start
-from util.infra           import ScheduleEntry
-from discovery.placer       import PriorityFn, construct
-from discovery.prompts      import SYSTEM, extract_code, initial_prompt, refine_prompt
+
+from problem_definition.check     import check
+from problem_definition.evaluate  import evaluate
 from problem_definition.scenarios import TRAINING
+from heuristics.discovered        import RUNS_CSV, save_iteration
+from util.infra                   import ScheduleEntry
+from discovery.placer             import PriorityFn, construct
+from discovery.prompts            import SYSTEM, extract_code, initial_prompt, refine_prompt
+from discovery.runtime            import compile_priority, time_limit
 
 load_dotenv()
+
 
 MODEL          = "openai/gpt-oss-120b"
 ITERATIONS     = 5
@@ -40,43 +36,8 @@ EVAL_TIMEOUT_S = 5     # bound buggy priority() so it can't hang the workshop
 MAX_TOKENS     = 1500  # cap on assistant reply length per iteration
 
 
-class HeuristicTimeoutError(TimeoutError):
-    pass
-
-
-@contextmanager
-def time_limit(seconds: int):
-    """Raise HeuristicTimeoutError if the wrapped block runs longer than
-    `seconds`. Unix-only (uses SIGALRM); main thread only."""
-    def _handler(signum, frame):
-        raise HeuristicTimeoutError(f"exceeded {seconds}s")
-    old = signal.signal(signal.SIGALRM, _handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old)
-
-
-def compile_priority(code: str) -> PriorityFn:
-    """Exec the generated code and return the `priority` callable. Workshop-grade
-    sandboxing only — this is `exec` on LLM output, run it in a throwaway env.
-    The model's dataclasses + earliest_start are injected so the LLM can use
-    them (including in type annotations)."""
-    ns: dict = {
-        "Step": Step, "State": State, "Order": Order, "Dish": Dish, "Station": Station,
-        "earliest_start": earliest_start,
-    }
-    exec(compile(code, "<llm-heuristic>", "exec"), ns)
-    fn = ns.get("priority")
-    if not callable(fn):
-        raise ValueError("generated code did not define a callable `priority`")
-    return fn
-
-
 def build_schedule(priority_fn: PriorityFn) -> list[ScheduleEntry]:
-    """Build a schedule and verify it satisfies the kitchen's constraints."""
+    """Run the placer for the current SCENARIO; verify the result is valid."""
     schedule   = construct(SCENARIO.orders, SCENARIO.kitchen, priority_fn)
     violations = check(schedule, SCENARIO.orders, SCENARIO.kitchen)
     if violations:
