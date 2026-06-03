@@ -195,9 +195,6 @@ Then evaluate it:
 
 ## Tips
 
-- Don't run `discover.py` under a debugger — the `signal.SIGALRM`-based
-  timeout interacts badly with `debugpy`. Run it as a normal Python
-  script.
 - The discovery loop trains on `TRAINING` only. Use `leaderboard.py`
   to check generalization to `HIDDEN_TEST` and `STRESS`.
 - `STRESS` is grill-heavy by design — mention bottleneck stations in
