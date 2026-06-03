@@ -25,6 +25,7 @@ from util.infra                   import ScheduleEntry
 from discovery.placer             import PriorityFn, construct
 from discovery.prompts            import SYSTEM, extract_code, initial_prompt, refine_prompt
 from discovery.runtime            import compile_priority, time_limit
+from discovery.tools              import chat_with_tools
 
 load_dotenv()
 
@@ -33,7 +34,7 @@ MODEL          = "openai/gpt-oss-120b"
 ITERATIONS     = 5
 SCENARIO       = TRAINING
 EVAL_TIMEOUT_S = 5     # bound buggy priority() so it can't hang the workshop
-MAX_TOKENS     = 1500  # cap on assistant reply length per iteration
+MAX_TOKENS     = 4096  # cap on assistant reply length per iteration (reasoning is verbose)
 
 
 def build_schedule(priority_fn: PriorityFn) -> list[ScheduleEntry]:
@@ -64,10 +65,8 @@ def discover() -> None:
             prompt = refine_prompt(SCENARIO, prev_value, prev_error, best_value)
 
         history.append({"role": "user", "content": prompt})
-        reply = client.chat_completion(messages=history, max_tokens=MAX_TOKENS).choices[0].message.content
-        history.append({"role": "assistant", "content": reply})
-
-        code = extract_code(reply)
+        reply = chat_with_tools(client, history, SCENARIO, MAX_TOKENS)
+        code  = extract_code(reply)
         print("--- proposed heuristic ---")
         print(code)
 
