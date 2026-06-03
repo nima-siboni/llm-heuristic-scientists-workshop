@@ -18,3 +18,4 @@ heuristics/discovered/runs.csv
 
 # Generated Gantt PNGs
 gantt/
+figs/
