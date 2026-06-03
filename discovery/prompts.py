@@ -35,6 +35,12 @@ Rules:
   - no imports beyond the Python stdlib; no I/O; no randomness
   - the heuristic must be read-only: do not mutate step or state
 
+You also have a `run_python(code)` tool. Use it whenever you want to
+inspect the scenario before committing — distribution of step durations,
+station load, due-date tightness, anything you're unsure about. Call it
+as many times as you need; we'll feed stdout back to you. When you've
+seen enough, reply with the heuristic.
+
 The shape of `step` and `state` is defined by problem_definition/model.py below; the
 placement loop is in placer.py. Treat both as the authoritative spec.
 A helper `earliest_start(step, state) -> float` is available in the global
@@ -95,7 +101,7 @@ def refine_prompt(
     )
 
 
-_CODE_RE = re.compile(r"```(?:python)?\s*(.*?)```", re.DOTALL)
+_CODE_RE = re.compile(r"```(?:python|py)?\s*\n(.*?)(?:```|\Z)", re.DOTALL)
 
 def extract_code(reply: str) -> str:
     m = _CODE_RE.search(reply)
