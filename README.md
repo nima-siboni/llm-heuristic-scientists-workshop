@@ -1,5 +1,9 @@
 # Bliss — LLM Heuristic Scientists Workshop
 
+Start here: **[Workshop slides](https://docs.google.com/presentation/d/1_khZ3uqANRbNXlWFCNyFZ5FSKuYD0A_E2vW89ZURu1A/edit?usp=sharing)**
+
+![Example kitchen schedule](docs/sample-schedule.png)
+
 A tiny restaurant-kitchen scheduling problem. Your job is to discover good
 priority heuristics — by hand, by prompting an LLM, or both — and beat the
 baselines on a held-out scenario.
