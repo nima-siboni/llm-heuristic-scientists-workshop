@@ -11,11 +11,13 @@ Usage
 """
 
 import os
+import time
 import traceback
 from datetime import datetime
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+from huggingface_hub.errors import HfHubHTTPError
 
 from problem_definition.check     import check
 from problem_definition.evaluate  import evaluate
@@ -34,6 +36,31 @@ ITERATIONS     = 5
 SCENARIO       = TRAINING
 EVAL_TIMEOUT_S = 5     # bound buggy priority() so it can't hang the workshop
 MAX_TOKENS     = 1500  # cap on assistant reply length per iteration
+MAX_RETRIES    = 5     # API call attempts before giving up on an iteration
+BACKOFF_BASE_S = 2.0   # exponential backoff base for 429 / transient errors
+
+
+def chat_with_retry(client: InferenceClient, history: list[dict]) -> str:
+    """Call the chat endpoint, retrying transient failures (esp. HTTP 429).
+
+    Uses exponential backoff (BACKOFF_BASE_S ** attempt). If the server sends
+    a Retry-After header on a 429, that wait is honored instead. Raises the
+    last error if all attempts are exhausted.
+    """
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = client.chat_completion(messages=history, max_tokens=MAX_TOKENS)
+            return resp.choices[0].message.content
+        except HfHubHTTPError as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            transient = status == 429 or (status is not None and status >= 500)
+            if not transient or attempt == MAX_RETRIES:
+                raise
+            retry_after = exc.response.headers.get("Retry-After") if exc.response is not None else None
+            wait = float(retry_after) if retry_after else BACKOFF_BASE_S ** attempt
+            print(f"--- HTTP {status}; retry {attempt}/{MAX_RETRIES - 1} in {wait:.1f}s ---")
+            time.sleep(wait)
+    raise RuntimeError("unreachable")  # loop either returns or raises
 
 
 def build_schedule(priority_fn: PriorityFn) -> list[ScheduleEntry]:
@@ -64,7 +91,7 @@ def discover() -> None:
             prompt = refine_prompt(SCENARIO, prev_value, prev_error, best_value)
 
         history.append({"role": "user", "content": prompt})
-        reply = client.chat_completion(messages=history, max_tokens=MAX_TOKENS).choices[0].message.content
+        reply = chat_with_retry(client, history)
         history.append({"role": "assistant", "content": reply})
 
         code = extract_code(reply)
